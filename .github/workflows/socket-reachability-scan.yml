@@ -1,6 +1,5 @@
 # Socket Security GitHub Actions Workflow
-# Reachability analysis for scheduled/manual scans
-# Scans and populates the Socket.dev UI with runtime reachability data
+# Full dependency scan with optional reachability analysis
 #
 # Socket Org: david-s-github (determined by API token)
 # Required API token scopes: socket-basics, uploaded-artifacts, full-scans, repo
@@ -12,6 +11,15 @@ on:
   schedule:
     - cron: "0 16 * * 1" # Runs at 9 AM Mountain Time every Monday
   workflow_dispatch:
+    inputs:
+      enable_reachability:
+        description: 'Enable reachability analysis (slower, requires enterprise)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 concurrency:
   group: socket-scan-scheduled
@@ -27,6 +35,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1  # Shallow clone for faster checkout
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -44,26 +54,17 @@ jobs:
       - name: Install Socket CLI
         run: pip install socketsecurity --upgrade
 
-      - name: Run Socket Security Scan with Reachability
+      - name: Run Socket Security Scan
         env:
           SOCKET_SECURITY_API_KEY: ${{ secrets.SOCKET_SECURITY_API_KEY }}
         run: |
-          set -x
-          # Run with reachability analysis
-          # Use unbuffered output to see logs in real-time
-          python -u -c "
-          import subprocess
-          import sys
-          cmd = [
-              'socketcli',
-              '--target-path', '$GITHUB_WORKSPACE',
-              '--repo', '${GITHUB_REPOSITORY#*/}',
-              '--reach',
-              '--reach-memory-limit', '16384',
-              '--reach-timeout', '1200',
-              '--enable-debug'
-          ]
-          print(f'Running: {\" \".join(cmd)}', flush=True)
-          result = subprocess.run(cmd, capture_output=False)
-          sys.exit(result.returncode)
-          "
+          REACH_FLAG=""
+          if [[ "${{ github.event.inputs.enable_reachability }}" == "true" ]]; then
+            REACH_FLAG="--reach --reach-memory-limit 16384 --reach-timeout 1200"
+          fi
+
+          socketcli \
+            --target-path $GITHUB_WORKSPACE \
+            --repo "${GITHUB_REPOSITORY#*/}" \
+            --enable-debug \
+            $REACH_FLAG
