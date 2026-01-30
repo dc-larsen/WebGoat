@@ -22,6 +22,7 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repo
@@ -43,18 +44,26 @@ jobs:
       - name: Install Socket CLI
         run: pip install socketsecurity --upgrade
 
-      - name: Run Socket Security Scan
+      - name: Run Socket Security Scan with Reachability
         env:
           SOCKET_SECURITY_API_KEY: ${{ secrets.SOCKET_SECURITY_API_KEY }}
         run: |
           set -x
-          socketcli \
-            --target-path $GITHUB_WORKSPACE \
-            --repo "${GITHUB_REPOSITORY#*/}" \
-            --enable-debug \
-            2>&1 | tee /tmp/socket-output.log || {
-              echo "Socket CLI exited with code $?"
-              echo "=== Last 100 lines of output ==="
-              tail -100 /tmp/socket-output.log
-              exit 1
-            }
+          # Run with reachability analysis
+          # Use unbuffered output to see logs in real-time
+          python -u -c "
+          import subprocess
+          import sys
+          cmd = [
+              'socketcli',
+              '--target-path', '$GITHUB_WORKSPACE',
+              '--repo', '${GITHUB_REPOSITORY#*/}',
+              '--reach',
+              '--reach-memory-limit', '16384',
+              '--reach-timeout', '1200',
+              '--enable-debug'
+          ]
+          print(f'Running: {\" \".join(cmd)}', flush=True)
+          result = subprocess.run(cmd, capture_output=False)
+          sys.exit(result.returncode)
+          "
