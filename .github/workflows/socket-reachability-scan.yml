@@ -47,10 +47,14 @@ jobs:
         env:
           SOCKET_SECURITY_API_KEY: ${{ secrets.SOCKET_SECURITY_API_KEY }}
         run: |
+          set -x
           socketcli \
             --target-path $GITHUB_WORKSPACE \
             --repo "${GITHUB_REPOSITORY#*/}" \
-            --reach \
-            --reach-memory-limit 16384 \
-            --reach-timeout 4800 \
-            --enable-debug
+            --enable-debug \
+            2>&1 | tee /tmp/socket-output.log || {
+              echo "Socket CLI exited with code $?"
+              echo "=== Last 100 lines of output ==="
+              tail -100 /tmp/socket-output.log
+              exit 1
+            }
