@@ -2,6 +2,7 @@
 # Full dependency scan with optional reachability analysis
 #
 # Socket Org: david-s-github (determined by API token)
+# Socket Workspace: Davids
 # Required API token scopes: socket-basics, uploaded-artifacts, full-scans, repo
 
 name: Socket Security Reachability Scan
@@ -70,6 +71,7 @@ jobs:
           socketcli \
             --target-path $GITHUB_WORKSPACE \
             --repo "${GITHUB_REPOSITORY#*/}" \
+            --workspace Davids \
             --enable-debug \
             $REACH_FLAG
 
